@@ -1,0 +1,428 @@
+import java.util.Iterator;
+import java.util.List;
+
+
+public class Positioning {
+
+    private static final double MAX_DISTANCE = Double.MAX_VALUE;
+    private Point currentPositionPoint;
+    private Map currentMap ;
+
+    public Positioning()
+    {
+
+    }
+
+    public void setCurrentPositionPoint(Point p)
+    {
+        currentPositionPoint = p;
+    }
+
+    public void initCurrentMap(List<Point> pList , String id) {
+        this.currentMap.setPoints(pList);
+        this.currentMap.setID(id);
+    }
+
+    // calculate the Euclidean Distance
+    private double calculateDis(Point p1, Point p2)
+    {
+        double distance = -1;
+
+
+        distance = Math.sqrt((p1.getAp1().getLevel()-p2.getAp1().getLevel())*(p1.getAp1().getLevel()-p2.getAp1().getLevel())
+                            +(p1.getAp2().getLevel()-p2.getAp2().getLevel())*(p1.getAp2().getLevel()-p2.getAp2().getLevel())
+                            +(p1.getAp3().getLevel()-p2.getAp3().getLevel())*(p1.getAp3().getLevel()-p2.getAp3().getLevel())
+                            +(p1.getAp4().getLevel()-p2.getAp4().getLevel())*(p1.getAp4().getLevel()-p2.getAp4().getLevel()));
+
+        return distance;
+    }
+
+    private Point findTheNearestPointByDis()
+    {
+        Point nearestPoint = new Point();
+        double minDis = MAX_DISTANCE;
+        Iterator<Point> itr = currentMap.getPointList().iterator();
+        while(itr.hasNext())
+        {
+            Point cP = itr.next();
+            double dis = calculateDis(cP,currentPositionPoint);
+            if (dis <= minDis)
+            {
+                minDis = dis;
+                nearestPoint = cP;
+            }
+        }
+
+        return nearestPoint;
+    }
+
+    // calculate the cosine in 4-dimensional map
+    private double calculateCos(Point p1, Point p2)
+    {
+        double cosine = -1; // 180° is impossible
+
+        Point Opoint = new Point();
+        cosine = calculateInnerProduct(p1,p2) / (calculateDis(p1,Opoint)*calculateDis(p2,Opoint));
+
+        return cosine;
+    }
+
+    // calculate the inner product
+    private double calculateInnerProduct(Point p1, Point p2) {
+        double InnerProduct = -2;
+
+        InnerProduct = (p1.getAp1().getLevel()*p2.getAp1().getLevel()
+                        +p1.getAp2().getLevel()*p2.getAp2().getLevel()
+                        +p1.getAp3().getLevel()*p2.getAp3().getLevel()
+                        +p1.getAp4().getLevel()*p2.getAp4().getLevel());
+
+        return InnerProduct;
+    }
+
+    private Point findTheNearestPointByCos()
+    {
+        Point nearestPoint = new Point();
+        double maxCos = 1;
+        Iterator<Point> itr = currentMap.getPointList().iterator();
+        while(itr.hasNext())
+        {
+            Point cP = itr.next();
+            double dis = calculateCos(cP,currentPositionPoint);
+            if (dis >= maxCos)
+            {
+                maxCos = dis;
+                nearestPoint = cP;
+            }
+        }
+
+        return nearestPoint;
+    }
+
+
+    //major positioning code
+    public int getMyPositionByDis()
+    {
+        return findTheNearestPointByDis().getId();
+    }
+
+    public int getMyPositionByCos()
+    {
+        return findTheNearestPointByCos().getId();
+    }
+}
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Reader {
+    static Connection con; // 声明Connection对象
+
+    static Statement sql; // 声明PreparedStatement对象
+
+    static PreparedStatement message;
+
+    public Reader(){
+
+    }
+    public Connection getConnection() {
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            System.out.println("数据库驱动加载成功");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/wifi_point?useSSL=false",
+                    "hmx",
+                    "64795649");
+            System.out.println("数据库连接成功");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return con;
+    }
+
+    public Point getPoint(int index){
+        Point point =new Point();
+
+        try {
+            sql = con.createStatement();
+            ResultSet rs = sql.executeQuery("select * from table_name ");
+            while (rs.next()) {
+                if (Integer.parseInt(rs.getString(1)) == index) {
+                    AP ap=new AP();
+                    ap.setLevel(rs.getInt(8));
+                    ap.setBSSID(rs.getString(3));
+                    ap.setSSID(rs.getString(4));
+                    switch (rs.getString(2)) {
+                        case "AP1":
+                            point.setAp1(ap);
+                            break;
+                        case "AP2":
+                            point.setAp2(ap);
+                            break;
+                        case "AP3":
+                            point.setAp3(ap);
+                            break;
+                        case "AP4":
+                            point.setAp4(ap);
+                            break;
+                    }
+
+                }
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return point;
+    }
+    public Map creat_map(){
+        Map map=new Map();
+        List<Point> pointList= new ArrayList<>();
+        Reader c = new Reader();
+        for(int i=0;i<18;i++){
+            if(i==11){
+                i=12;
+            }
+            pointList.add(c.getPoint(i));
+        }
+        map.setPoints(pointList);
+
+        return map;
+    }
+
+}
+
+UPDATE wifi_point.table_name SET Point = 1, AP = 'AP1', BSSID = '0e:69:6c:d6:a2:f7', SSID = 'web.wlan.bjtu', level1 = '-58', level2 = '-58', level3 = '-52', average = '-56';
+UPDATE wifi_point.table_name SET Point = 1, AP = 'AP2', BSSID = '16:69:6c:d6:a2:f7', SSID = 'local.wlan.bjtu', level1 = '-59', level2 = '-59', level3 = '-54', average = '-57';
+UPDATE wifi_point.table_name SET Point = 1, AP = 'AP3', BSSID = '0a:69:6c:d6:a2:f7', SSID = 'eduroam', level1 = '-59', level2 = '-59', level3 = '-53', average = '-57';
+UPDATE wifi_point.table_name SET Point = 1, AP = 'AP4', BSSID = '0a:69:6c:d6:8d:98', SSID = 'eduroam', level1 = '-59', level2 = '-59', level3 = '-', average = '-59';
+UPDATE wifi_point.table_name SET Point = 2, AP = 'AP1', BSSID = '12:69:6c:d6:8d:97', SSID = 'phone.wlan.bjtu', level1 = '-44', level2 = '-', level3 = '-', average = '-44';
+UPDATE wifi_point.table_name SET Point = 2, AP = 'AP2', BSSID = '16:69:6c:d6:8d:97', SSID = 'local.wlan.bjtu', level1 = '-46', level2 = '-53', level3 = '-', average = '-50';
+UPDATE wifi_point.table_name SET Point = 2, AP = 'AP3', BSSID = '0e:69:6c:d6:8d:97', SSID = 'web.wlan.bjtu', level1 = '-46', level2 = '-53', level3 = '-', average = '-50';
+UPDATE wifi_point.table_name SET Point = 2, AP = 'AP4', BSSID = '1a:69:6c:d6:8d:97', SSID = 'NULL', level1 = '-46', level2 = '-', level3 = '-', average = '-46';
+UPDATE wifi_point.table_name SET Point = 3, AP = 'AP1', BSSID = '1a:69:6c:bb:23:04', SSID = 'NULL', level1 = '-35', level2 = '-39', level3 = '-39', average = '-38';
+UPDATE wifi_point.table_name SET Point = 3, AP = 'AP2', BSSID = '16:69:6c:bb:23:04', SSID = 'local.wlan.bjtu', level1 = '-37', level2 = '-', level3 = '-38', average = '-38';
+UPDATE wifi_point.table_name SET Point = 3, AP = 'AP3', BSSID = '0a:69:6c:bb:23:04', SSID = 'eduroam', level1 = '-37', level2 = '-', level3 = '-38', average = '-38';
+UPDATE wifi_point.table_name SET Point = 3, AP = 'AP4', BSSID = '0e:69:6c:b9:71:9d', SSID = 'web.wlan.bjtu', level1 = '-37', level2 = '-37', level3 = '-', average = '-37';
+UPDATE wifi_point.table_name SET Point = 4, AP = 'AP1', BSSID = '1a:69:6c:d6:9c:bb', SSID = 'NULL', level1 = '-58', level2 = '-', level3 = '-', average = '-58';
+UPDATE wifi_point.table_name SET Point = 4, AP = 'AP2', BSSID = '16:69:6c:d6:9c:bb', SSID = 'local.wlan.bjtu', level1 = '-59', level2 = '-53', level3 = '-54', average = '-55';
+UPDATE wifi_point.table_name SET Point = 4, AP = 'AP3', BSSID = '12:69:6c:d6:a3:03', SSID = 'phone.wlan.bjtu', level1 = '-59', level2 = '-53', level3 = '-53', average = '-55';
+UPDATE wifi_point.table_name SET Point = 4, AP = 'AP4', BSSID = '0a:69:6c:d6:9c:bb', SSID = 'eduroam', level1 = '-60', level2 = '-54', level3 = '-54', average = '-56';
+UPDATE wifi_point.table_name SET Point = 5, AP = 'AP1', BSSID = '0e:69:6c:d6:8f:17', SSID = 'web.wlan.bjtu', level1 = '-51', level2 = '-52', level3 = '-49', average = '-52';
+UPDATE wifi_point.table_name SET Point = 5, AP = 'AP2', BSSID = '12:69:6c:d6:8f:17', SSID = 'phone.wlan.bjtu', level1 = '-51', level2 = '-52', level3 = '-49', average = '-52';
+UPDATE wifi_point.table_name SET Point = 5, AP = 'AP3', BSSID = '1a:69:6c:d6:8f:17', SSID = 'NULL', level1 = '-51', level2 = '-53', level3 = '-', average = '-52';
+UPDATE wifi_point.table_name SET Point = 5, AP = 'AP4', BSSID = '16:69:6c:d6:8f:17', SSID = 'local.wlan.bjtu', level1 = '-52', level2 = '-52', level3 = '-49', average = '-51';
+UPDATE wifi_point.table_name SET Point = 6, AP = 'AP1', BSSID = '0e:69:6c:d3:40:8e', SSID = 'web.wlan.bjtu', level1 = '-31', level2 = '-32', level3 = '-', average = '-32';
+UPDATE wifi_point.table_name SET Point = 6, AP = 'AP2', BSSID = '0a:69:6c:d3:40:8e', SSID = 'eduroam', level1 = '-31', level2 = '-32', level3 = '-', average = '-32';
+UPDATE wifi_point.table_name SET Point = 6, AP = 'AP3', BSSID = '1a:69:6c:d3:40:8e', SSID = 'NULL', level1 = '-32', level2 = '-32', level3 = '-', average = '-32';
+UPDATE wifi_point.table_name SET Point = 6, AP = 'AP4', BSSID = '12:69:6c:d3:40:8e', SSID = 'phone.wlan.bjtu', level1 = '-32', level2 = '-33', level3 = '-', average = '-33';
+UPDATE wifi_point.table_name SET Point = 7, AP = 'AP1', BSSID = '0e:69:6c:bb:87:fb', SSID = 'web.wlan.bjtu', level1 = '-54', level2 = '-54', level3 = '-54', average = '-54';
+UPDATE wifi_point.table_name SET Point = 7, AP = 'AP2', BSSID = '1a:69:6c:bb:87:fb', SSID = 'NULL', level1 = '-54', level2 = '-54', level3 = '-54', average = '-54';
+UPDATE wifi_point.table_name SET Point = 7, AP = 'AP3', BSSID = '12:69:6c:bb:87:fb', SSID = 'phone.wlan.bjtu', level1 = '-54', level2 = '-54', level3 = '-54', average = '-54';
+UPDATE wifi_point.table_name SET Point = 7, AP = 'AP4', BSSID = '16:69:6c:bb:87:fb', SSID = 'local.wlan.bjtu', level1 = '-54', level2 = '-54', level3 = '-54', average = '-54';
+UPDATE wifi_point.table_name SET Point = 8, AP = 'AP1', BSSID = '16:69:6c:d4:47:f6', SSID = 'local.wlan.bjtu', level1 = '-50', level2 = '-50', level3 = '-49', average = '-50';
+UPDATE wifi_point.table_name SET Point = 8, AP = 'AP2', BSSID = '1a:69:6c:d4:47:f6', SSID = 'NULL', level1 = '-52', level2 = '-52', level3 = '-', average = '-52';
+UPDATE wifi_point.table_name SET Point = 8, AP = 'AP3', BSSID = '12:69:6c:d4:47:f6', SSID = 'phone.wlan.bjtu', level1 = '-52', level2 = '-52', level3 = '-50', average = '-51';
+UPDATE wifi_point.table_name SET Point = 8, AP = 'AP4', BSSID = '0e:69:6c:d4:47:f6', SSID = 'web.wlan.bjtu', level1 = '-52', level2 = '-52', level3 = '-', average = '-52';
+UPDATE wifi_point.table_name SET Point = 9, AP = 'AP1', BSSID = '16:69:6c:d6:a3:03', SSID = 'local.wlan.bjtu', level1 = '-50', level2 = '-36', level3 = '-57', average = '-48';
+UPDATE wifi_point.table_name SET Point = 9, AP = 'AP2', BSSID = '0e:69:6c:d6:a3:03', SSID = 'web.wlan.bjtu', level1 = '-50', level2 = '-37', level3 = '-58', average = '-48';
+UPDATE wifi_point.table_name SET Point = 9, AP = 'AP3', BSSID = '12:69:6c:d6:a3:03', SSID = 'phone.wlan.bjtu', level1 = '-51', level2 = '-66', level3 = '-58', average = '-58';
+UPDATE wifi_point.table_name SET Point = 9, AP = 'AP4', BSSID = '0a:69:6c:d6:a3:03', SSID = 'eduroam', level1 = '-53', level2 = '-36', level3 = '-58', average = '-49';
+UPDATE wifi_point.table_name SET Point = 10, AP = 'AP1', BSSID = '12:69:6c:b9:71:9d', SSID = 'phone.wlan.bjtu', level1 = '-62', level2 = '-62', level3 = '-61', average = '-62';
+UPDATE wifi_point.table_name SET Point = 10, AP = 'AP2', BSSID = '1a:69:6c:b9:71:9d', SSID = 'NULL', level1 = '-62', level2 = '-62', level3 = '-61', average = '-62';
+UPDATE wifi_point.table_name SET Point = 10, AP = 'AP3', BSSID = '0a:69:6c:b9:71:9d', SSID = 'enduroam', level1 = '-62', level2 = '-62', level3 = '-61', average = '-62';
+UPDATE wifi_point.table_name SET Point = 10, AP = 'AP4', BSSID = '16:69:6c:b9:71:9d', SSID = 'local.wlan.bjtu', level1 = '-62', level2 = '-62', level3 = '-61', average = '-62';
+UPDATE wifi_point.table_name SET Point = 12, AP = 'AP1', BSSID = '1a:69:6c:d6:a5:2f', SSID = 'NULL', level1 = '-', level2 = '-39', level3 = '-39', average = '-39';
+UPDATE wifi_point.table_name SET Point = 12, AP = 'AP2', BSSID = '12:69:6c:d6:a5:2f', SSID = 'phone.wlan.bjtu', level1 = '-', level2 = '-39', level3 = '-39', average = '-39';
+UPDATE wifi_point.table_name SET Point = 12, AP = 'AP3', BSSID = '0a:69:6c:d6:a5:2f', SSID = 'eduroam', level1 = '-', level2 = '-40', level3 = '-40', average = '-40';
+UPDATE wifi_point.table_name SET Point = 12, AP = 'AP4', BSSID = '0e:69:6c:d6:a5:2f', SSID = 'web.wlan.bjtu', level1 = '-', level2 = '-40', level3 = '-40', average = '-40';
+UPDATE wifi_point.table_name SET Point = 13, AP = 'AP1', BSSID = '16:69:6c:d6:a3:7b', SSID = 'local.wlan.bjtu', level1 = '-43', level2 = '-', level3 = '-', average = '-43';
+UPDATE wifi_point.table_name SET Point = 13, AP = 'AP2', BSSID = '16:69:6c:d6:a2:f7', SSID = 'local.wlan.bjtu', level1 = '-48', level2 = '-', level3 = '-', average = '-48';
+UPDATE wifi_point.table_name SET Point = 13, AP = 'AP3', BSSID = '0a:69:6c:d6:a2:f7', SSID = 'eduroam', level1 = '-48', level2 = '-', level3 = '-', average = '-48';
+UPDATE wifi_point.table_name SET Point = 13, AP = 'AP4', BSSID = '12:69:6c:d6:a2:f7', SSID = 'phone.wlan.bjtu', level1 = '-48', level2 = '-', level3 = '-', average = '-48';
+UPDATE wifi_point.table_name SET Point = 14, AP = 'AP1', BSSID = '16:69:6c:d3:25:7a', SSID = 'local.wlan.bjtu', level1 = '-52', level2 = '-49', level3 = '-', average = '-51';
+UPDATE wifi_point.table_name SET Point = 14, AP = 'AP2', BSSID = '0a:69:6c:d3:25:7a', SSID = 'eduroam', level1 = '-52', level2 = '-49', level3 = '-', average = '-51';
+UPDATE wifi_point.table_name SET Point = 14, AP = 'AP3', BSSID = '16:69:6c:b9:70:d7', SSID = 'local.wlan.bjtu', level1 = '-53', level2 = '-', level3 = '-', average = '-53';
+UPDATE wifi_point.table_name SET Point = 14, AP = 'AP4', BSSID = '12:69:6c:d3:25:7a', SSID = 'phone.wlan.bjtu', level1 = '-53', level2 = '-', level3 = '-', average = '-53';
+UPDATE wifi_point.table_name SET Point = 15, AP = 'AP1', BSSID = '0a:69:6c:d6:91:27', SSID = 'eduroam', level1 = '-47', level2 = '-40', level3 = '-36', average = '-41';
+UPDATE wifi_point.table_name SET Point = 15, AP = 'AP2', BSSID = '16:69:6c:d6:91:27', SSID = 'local.wlan.bjtu', level1 = '-48', level2 = '-39', level3 = '-36', average = '-41';
+UPDATE wifi_point.table_name SET Point = 15, AP = 'AP3', BSSID = '1a:69:6c:d6:91:27', SSID = 'NULL', level1 = '-48', level2 = '-38', level3 = '-36', average = '-41';
+UPDATE wifi_point.table_name SET Point = 15, AP = 'AP4', BSSID = '12:69:6C:d6:91:27', SSID = 'phone.wlan.bjtu', level1 = '-48', level2 = '-38', level3 = '-36', average = '-41';
+UPDATE wifi_point.table_name SET Point = 16, AP = 'AP1', BSSID = '1a:69:6c:d4:39:e6', SSID = 'NULL', level1 = '-35', level2 = '-30', level3 = '-', average = '-33';
+UPDATE wifi_point.table_name SET Point = 16, AP = 'AP2', BSSID = '16:69:6c:d4:39:e6', SSID = 'local.wlan.bjtu', level1 = '-36', level2 = '-30', level3 = '-', average = '-33';
+UPDATE wifi_point.table_name SET Point = 16, AP = 'AP3', BSSID = '0a:69:6c:d4:39:e6', SSID = 'eduroam', level1 = '-36', level2 = '-31', level3 = '-', average = '-34';
+UPDATE wifi_point.table_name SET Point = 16, AP = 'AP4', BSSID = '0e:69:6c:d4:39:e6', SSID = 'web.wlan.bjtu', level1 = '-36', level2 = '-30', level3 = '-', average = '-33';
+UPDATE wifi_point.table_name SET Point = 17, AP = 'AP1', BSSID = '0e:69:6c:d3:6d:77', SSID = 'web.wlan.bjtu', level1 = '-61', level2 = '-61', level3 = '-62', average = '-61';
+UPDATE wifi_point.table_name SET Point = 17, AP = 'AP2', BSSID = '12:69:6c:d3:6d:77', SSID = 'phone.wlan.bjtu', level1 = '-61', level2 = '-61', level3 = '-62', average = '-61';
+UPDATE wifi_point.table_name SET Point = 17, AP = 'AP3', BSSID = '0a:69:6c:d3:6d:77', SSID = 'eduroam', level1 = '-61', level2 = '-61', level3 = '-', average = '-61';
+UPDATE wifi_point.table_name SET Point = 17, AP = 'AP4', BSSID = '16:69:6c:d3:6d:77', SSID = 'local.wlan.bjtu', level1 = '-62', level2 = '-62', level3 = '-66', average = '-63';
+UPDATE wifi_point.table_name SET Point = 18, AP = 'AP1', BSSID = '16:69:6c:d6:91:27', SSID = 'local.wlan.bjtu', level1 = '-42', level2 = '-66', level3 = '-59', average = '-56';
+UPDATE wifi_point.table_name SET Point = 18, AP = 'AP2', BSSID = '1a:69:6c:d6:91:27', SSID = 'NULL', level1 = '-42', level2 = '-65', level3 = '-58', average = '-55';
+UPDATE wifi_point.table_name SET Point = 18, AP = 'AP3', BSSID = '12:69:6c:d6:91:27', SSID = 'phone.wlan.bjtu', level1 = '-42', level2 = '-65', level3 = '-', average = '-54';
+UPDATE wifi_point.table_name SET Point = 18, AP = 'AP4', BSSID = '0a:69:6c:d6:91:27', SSID = 'eduroam', level1 = '-42', level2 = '-', level3 = '-59', average = '-51';
+UPDATE wifi_point.table_name SET Point = 19, AP = 'AP1', BSSID = '0e:69:6c:d6:9c:bb', SSID = 'web.wlan.bjtu', level1 = '-52', level2 = '-60', level3 = '-', average = '-56';
+UPDATE wifi_point.table_name SET Point = 19, AP = 'AP2', BSSID = '16:69:6c:d6:9c:bb', SSID = 'local.wlan.bjtu', level1 = '-53', level2 = '-60', level3 = '-', average = '-57';
+UPDATE wifi_point.table_name SET Point = 19, AP = 'AP3', BSSID = '1a:69:6c:d6:9c:bb', SSID = 'NULL', level1 = '-53', level2 = '-60', level3 = '-', average = '-57';
+UPDATE wifi_point.table_name SET Point = 19, AP = 'AP4', BSSID = '12:69:6c:d6:9c:bb', SSID = 'phone.wlan.bjtu', level1 = '-53', level2 = '-60', level3 = '-', average = '-57';
+public class AP {
+    private String BSSID;
+    private String SSID;
+    private int level;
+
+    //constructor with out variable
+    public AP()
+    {
+        BSSID = "00:00:00:00:00:00";
+        SSID = "";
+        level = 0;
+    }
+    //constructor with 3 vars
+    public AP(String B,String S,int l)
+    {
+        BSSID = B;
+        SSID = S;
+        level = l;
+    }
+
+    //GETTERS AND SETTERS FOR ALL VARS
+    public void setBSSID(String BSSID) {
+        this.BSSID = BSSID;
+    }
+
+    public String getBSSID() {
+        return BSSID;
+    }
+
+    public String getSSID() { return SSID; }
+
+    public void setSSID(String SSID) {
+        this.SSID = SSID;
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
+    public void setLevel(int level) {
+        this.level = level;
+    }
+    //END OF GETTERS AND SETTERS
+}
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Map {
+    //singleton version
+    private  Map map;
+    private  List<Point> pointList;
+    private String id;
+
+    public Map() {
+
+    }
+
+    public void setPoints(List<Point> pList)
+    {
+        this.pointList = pList;
+    }
+
+    public void setID(String id)
+    {
+        this.id = id;
+    }
+
+    public List<Point> getPointList()
+    {
+        return pointList;
+    }
+
+    public String getID()
+    {
+        return id;
+    }
+
+    public void insert_Point(Point point){pointList.add(point);}
+
+}
+
+public class Point {
+    private AP ap1,ap2,ap3,ap4; //4-dimension map's position
+    private int id; //1-dimension map's position
+    private int x,y; //2-dimension map's position
+
+    //constructor without var
+    public Point()
+    {
+        ap1 = new AP();
+        ap2 = new AP();
+        ap3 = new AP();
+        ap4 = new AP();
+        id = -1;  //-1 means not valued
+        x = -1;
+        y = -1;
+    }
+    //constructor with all vars
+    public Point(AP ap1, AP ap2, AP ap3, AP ap4,int id,int x,int y)
+    {
+        this.ap1 = ap1;
+        this.ap2 = ap2;
+        this.ap3 = ap3;
+        this.ap4 = ap4;
+        this.id = id;
+        this.x = x;
+        this.y = y;
+    }
+
+    //GETTERS AND SETTERS
+    public AP getAp1() {
+        return ap1;
+    }
+
+    public void setAp1(AP ap1) {
+        this.ap1 = ap1;
+    }
+
+    public AP getAp2() {
+        return ap2;
+    }
+
+    public void setAp2(AP ap2) {
+        this.ap2 = ap2;
+    }
+
+    public AP getAp3() {
+        return ap3;
+    }
+
+    public void setAp3(AP ap3) {
+        this.ap3 = ap3;
+    }
+
+    public AP getAp4() {
+        return ap4;
+    }
+
+    public void setAp4(AP ap4) {
+        this.ap4 = ap4;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public void setY(int y) {
+        this.y = y;
+    }
+    //END OF GETTERS AND SETTERS
+}
